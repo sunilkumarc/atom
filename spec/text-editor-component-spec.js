@@ -175,8 +175,6 @@ describe('TextEditorComponent', () => {
     jasmine.attachToDOM(element)
 
     expect(getBaseCharacterWidth(component)).toBe(55)
-
-    console.log(element.offsetWidth);
     expect(lineNodeForScreenRow(component, 3).textContent).toBe(
       '    var pivot = items.shift(), current, left = [], '
     )
@@ -342,6 +340,34 @@ describe('TextEditorComponent', () => {
         (4 * component.measurements.baseCharacterWidth)
       )
       expect(scroller.scrollLeft).toBe(expectedScrollLeft)
+    })
+  })
+
+  describe('line and line number decorations', () => {
+    ffit('adds decoration classes on screen lines spanned by decorated markers', async () => {
+      const {component, element, editor} = buildComponent({width: 435, attach: false})
+      editor.setSoftWrapped(true)
+      jasmine.attachToDOM(element)
+
+      expect(lineNodeForScreenRow(component, 3).textContent).toBe(
+        '    var pivot = items.shift(), current, left = [], '
+      )
+      expect(lineNodeForScreenRow(component, 4).textContent).toBe(
+        '    right = [];'
+      )
+
+      const marker1 = editor.markScreenRange([[1, 10], [3, 10]])
+      const layer = editor.addMarkerLayer()
+      const marker2 = layer.markScreenPosition([5, 0])
+      const marker3 = layer.markScreenPosition([8, 0])
+      const marker4 = layer.markScreenPosition([10, 0])
+      const markerDecoration = editor.decorateMarker(marker1, {type: ['line', 'line-number'], class: 'a'})
+      const layerDecoration = editor.decorateMarkerLayer(layer, {type: ['line', 'line-number'], class: 'b'})
+      layerDecoration.setPropertiesForMarker(marker4, {type: 'line', class: 'c'})
+      await component.getNextUpdatePromise()
+
+      expect(lineNodeForScreenRow(component, 1).classList.contains('a')).toBe(true)
+
     })
   })
 })

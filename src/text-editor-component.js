@@ -38,6 +38,10 @@ class TextEditorComponent {
     this.lastKeydownBeforeKeypress = null
     this.openedAccentedCharacterMenu = false
     this.cursorsToRender = []
+    this.decorationsToRender = {
+      lineNumbers: new Map(),
+      lines: new Map()
+    }
 
     if (this.props.model) this.observeModel()
     resizeDetector.listenTo(this.element, this.didResize.bind(this))
@@ -74,6 +78,7 @@ class TextEditorComponent {
     if (this.pendingAutoscroll) this.initiateAutoscroll()
     this.populateVisibleRowRange()
     const longestLineToMeasure = this.checkForNewLongestLine()
+    this.queryDecorationsToRender()
     this.queryCursorsToRender()
 
     etch.updateSync(this)
@@ -392,6 +397,52 @@ class TextEditorComponent {
       }
     }
   }
+
+  queryDecorationsToRender () {
+    this.decorationsToRender.lineNumbers.clear()
+    this.decorationsToRender.lines.clear()
+
+    const decorationsByMarker =
+      this.getModel().decorationManager.decorationPropertiesByMarkerForScreenRowRange(
+        this.getRenderedStartRow(),
+        this.getRenderedEndRow()
+      )
+
+    decorationsByMarker.forEach((decorations, marker) => {
+      const screenRange = marker.getScreenRange()
+      const reversed = marker.isReversed()
+      for (let i = 0, length = decorations.length; i < decorations.length; i++) {
+        const decoration = decorations[i]
+        this.addToDecorationsToRender(decoration.type, decoration, screenRange, reversed)
+      }
+    })
+  }
+
+  addToDecorationsToRender (type, decoration, screenRange, reversed) {
+    if (Array.isArray(type)) {
+      for (let i = 0, length = type.length; i < length; i++) {
+        this.addToDecorationsToRender(type[i], decoration, screenRange, reversed)
+      }
+    } else {
+      switch (type) {
+        case 'line-number':
+          for (let row = screenRange.start.row; row <= screenRange.end.row; row++) {
+            const currentClassName = this.decorationsToRender.lineNumbers.get(row)
+            const newClassName = currentClassName ? currentClassName + ' ' + decoration.class : decoration.class
+            this.decorationsToRender.lineNumbers.set(row, newClassName)
+          }
+          break
+        case 'line':
+          for (let row = screenRange.start.row; row <= screenRange.end.row; row++) {
+            const currentClassName = this.decorationsToRender.lines.get(row)
+            const newClassName = currentClassName ? currentClassName + ' ' + decoration.class : decoration.class
+            this.decorationsToRender.lines.set(row, newClassName)
+          }
+          break
+      }
+    }
+  }
+
 
   positionCursorsToRender () {
     const height = this.measurements.lineHeight + 'px'
@@ -878,6 +929,7 @@ class TextEditorComponent {
     const scheduleUpdate = this.scheduleUpdate.bind(this)
     this.disposables.add(model.selectionsMarkerLayer.onDidUpdate(scheduleUpdate))
     this.disposables.add(model.displayLayer.onDidChangeSync(scheduleUpdate))
+    this.disposables.add(model.onDidUpdateDecorations(scheduleUpdate))
     this.disposables.add(model.onDidRequestAutoscroll(this.didRequestAutoscroll.bind(this)))
   }
 
